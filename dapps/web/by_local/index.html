@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Digital items</title>
+  <meta name="description" content="">
+  <meta name="author" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <main>
+    <h2>Preparation</h2>
+    <h3>Wallet</h3>
+    <textarea id='iWalletPassword' cols='60' rows='1' placeholder='password'>this is password</textarea>
+    <br>
+    <button type='button' id='iWalletReady'>Ready</button>
+    <br>
+    <p id='iWalletInfo'>Wait a minute.</p>
+    <h3>Import account : Ganache</h3>
+    <textarea id='iImportAddress' cols='60' rows='1' placeholder='address'></textarea>
+    <br>
+    <textarea id='iImportPrivateKey' cols='60' rows='3' placeholder='privateKey'></textarea>
+    <br>
+    <button type='button' id='iImportAction'>Import</button>
+    <br>
+    <br>
+    <h3>Send to wallet</h3>
+    <label>Imported account</label>
+    <br>
+    <textarea id='iAddressG' cols='60' rows='1' placeholder='0x...'></textarea>
+    <br>
+    <button type='button' id='iSendToWallet'>Send from the above to the below</button>
+    <br>
+    <textarea id='iAmountG' cols='60' rows='1'>1000000000000000000 Wei</textarea>
+    <br>
+    <br>
+    <label>PlayerP</label>
+    <br>
+    <textarea id='iAddressP' cols='60' rows='1' placeholder='0x...'></textarea>
+    <br>
+    <textarea id='iAmountP' cols='60' rows='1' readonly>0 Wei</textarea>
+    <br>
+    <br>
+    <label>PlayerQ</label>
+    <br>
+    <textarea id='iAddressQ' cols='60' rows='1' placeholder='0x...'></textarea>
+    <br>
+    <textarea id='iAmountQ' cols='60' rows='1' readonly>0 Wei</textarea>
+    <br>
+    <br>
+    <p id='iSendInfo'></p>
+    <br>
+    
+    <hr>
+    <h2>DApp</h2>
+    <h3>Asset</h3>
+    <form>
+      <input type="radio" name="tAccounts" value="PlayerP" id="iZPlayerP"> PlayerP
+      <input type="radio" name="tAccounts" value="PlayerQ" id="iZPlayerQ"> PlayerQ
+    </form>
+    <br>
+    <label>Address : </label><label id="iZAddress">...</label><br>
+    <label>Wei : </label><label id="iZAmountWei">...</label><br>
+    <label>ItemA : </label><label id="iZAmountItemA">...</label><br>
+    <br>
+    <button id="iCreateItemA">Create : ItemA</button>
+    <br>
+    <button id="iDepositWei">Deposit 3000 Gwei</button>
+    <br>
+    <button id="iWithdrawWei">Withdraw all wei</button>
+    <br>
+    <button id="iSellOrder">Sell order : 10 ItemA (@price: 900 wei)</button>
+    <br>
+    <button id="iBuyOrder">Buy order : 6 ItemA (@price: 900 wei)</button>
+    <br>
+    <p id='iContractInfo'>Select Player.</p>
+
+    <h3>Order : ItemA</h3>
+    <h4>price : 900 wei</h4>
+    <label>- Sell Order : </label>
+    <label id="iSellList0"></label>
+    <label id="iSellList1"></label>
+    <label id="iSellList2"></label>
+    <label id="iSellList3"></label>
+    <br>
+    <label>- Buy Order : </label>
+    <label id="iBuyList0"></label>
+    <label id="iBuyList1"></label>
+    <label id="iBuyList2"></label>
+    <label id="iBuyList3"></label>
+    <br>
+    <br>
+    <button id="iSell0">Sell[0]</button>
+    <button id="iSell1">Sell[1]</button>
+    <button id="iSell2">Sell[2]</button>
+    <button id="iSell3">Sell[3]</button>
+    <br><br>
+    <button id="iBuy0">Buy[0]</button>
+    <button id="iBuy1">Buy[1]</button>
+    <button id="iBuy2">Buy[2]</button>
+    <button id="iBuy3">Buy[3]</button>
+    <br><br>
+  </main>
+  <script type="text/javascript" src="./js/abiJson_node.js"></script>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/ethereum/web3.js@1.0.0-beta.34/dist/web3.min.js"></script>
+  <script type="text/javascript" src="./js/main.js"></script>
+</body>
+</html>
