@@ -40,9 +40,8 @@ contract DigitalItems is ERC1155 {
         s_items[idItem].name = name;
         _mint(msg.sender, idItem, amountItem, "");
     }
-    function Item_GetIdItem(address xCreater, string memory name) public pure returns(uint256) {
-        uint256 idItem = uint256(keccak256(abi.encodePacked(xCreater, name)));
-        return idItem;
+    function Item_GetIdItem(address xCreater, string memory name) public pure returns(uint256 idItem) {
+        idItem = uint256(keccak256(abi.encodePacked(xCreater, name)));
     }
     function Item_Add(uint256 idItem, uint32 amountItem) public {
         require(s_items[idItem].creater == msg.sender, "[ERR]Not creater.");
@@ -52,9 +51,8 @@ contract DigitalItems is ERC1155 {
         require(s_items[idItem].creater == msg.sender, "[ERR]Not creater.");
         _burn(msg.sender, idItem, amountItem);
     }
-    function Item_GetBalance(address xOwner, uint256 idItem) public view returns(uint256) {
-        uint256 balance = balanceOf(xOwner, idItem);
-        return balance;
+    function Item_GetBalance(address xOwner, uint256 idItem) public view returns(uint256 balance) {
+        balance = balanceOf(xOwner, idItem);
     }
 
     mapping(address => uint256) public s_balances;
@@ -70,9 +68,8 @@ contract DigitalItems is ERC1155 {
             payable(msg.sender).transfer(balance);
         }
     }
-    function Wei_GetBalance(address xOwner) public view returns(uint256) {
-        uint256 balance = s_balances[xOwner];
-        return balance;
+    function Wei_GetBalance(address xOwner) public view returns(uint256 balance) {
+        balance = s_balances[xOwner];
     }
     
     uint8 constant ORDER_KIND_SELL = 0;
@@ -94,14 +91,19 @@ contract DigitalItems is ERC1155 {
         string name;
         mapping(uint256 => PriceInfo) prices;
     }
+    modifier fromSender(uint256 idItem, uint32 amountItem) {
+        uint256 amountItemBefore = balanceOf(msg.sender, idItem);
+        require(amountItemBefore >= amountItem, "[ERR]Not enough Item.");
+        _;
+    }
     function AddOrderSell(uint256 idItem, uint32 price, uint32 amountItem) public fromSender(idItem, amountItem) {
         item_fromSenderToOnOrder(idItem, amountItem);
         s_items[idItem].prices[price].orderInfo[ORDER_KIND_SELL].orderList.push(Order(msg.sender, amountItem));
-        setApprovalForAll(address(s_onOrder),true);
     }
     function AddOrderBuy(uint256 idItem, uint32 price, uint32 amountItem) public {
         uint256 amountWei = amountItem * price;
-        require(s_balances[msg.sender] >= amountWei, "[ERR]Not enough wei.");   
+        amountWei += getFeeBase(amountWei);			// Fee payment by Buyer
+        require(s_balances[msg.sender] >= amountWei, "[ERR]Not enough wei.");
         wei_fromSenderToOnOrder(amountWei);
         s_items[idItem].prices[price].orderInfo[ORDER_KIND_BUY].orderList.push(Order(msg.sender, amountItem));
         setApprovalForAll(address(s_onOrder),true);
@@ -116,120 +118,117 @@ contract DigitalItems is ERC1155 {
         xOwner = orderInfo.orderList[indexOrder].xOwner;
         amountItem = orderInfo.orderList[indexOrder].amountItem;
     }
-//    function CancelOrder() public {
-//        //@todo
-//        // amount:0
-//        // Wei : xOnOrder > msg.sender
-//        // Item : xOnOrder > msg.sender
-//    }
-    modifier fromSender(uint256 idItem, uint32 amountItem) {
-        uint256 amountItemBefore = balanceOf(msg.sender, idItem);
-        require(amountItemBefore >= amountItem, "[ERR]Not enough Item.");
-        _;
-    }
 
     uint8 constant SELF_KIND_SELLER = 0;
     uint8 constant SELF_KIND_BUYER = 1;
-    struct AgreeOrder {
-        uint256 idItem;
-        uint32 price;
-        uint8 selfKind;
-        uint8 orderKindSelf;
-        uint32 indexOrderSelf;
-        uint32 amountItemSelf;
-        uint8 orderKindPeer;
-        uint32 indexOrderPeer;
-        uint32 amountItemPeer;
-    }
     function TryAgreeOrders(uint256 idItem, uint32 price, uint8 orderKindSelf, uint32 indexOrderSelf, uint32 amountItemReqSelf) public {
-        //@todo: fee - Everyone can run this transaction.
-        AgreeOrder memory agreeOrder;
-        agreeOrder.idItem = idItem;
-        agreeOrder.price = price;
-        agreeOrder.orderKindSelf = orderKindSelf;
-        agreeOrder.indexOrderSelf = indexOrderSelf;
+        TryMatchingOrders(idItem, price, orderKindSelf, indexOrderSelf, amountItemReqSelf);
+    }
+    function TryMatchingOrders(uint256 idItem, uint32 price, uint8 orderKindSelf, uint32 indexOrderSelf, uint32 amountItemReqSelf) public {
         OrderInfo storage s_orderInfoSelf = s_items[idItem].prices[price].orderInfo[orderKindSelf];
-        agreeOrder.amountItemSelf = s_orderInfoSelf.orderList[indexOrderSelf].amountItem;
-        require(amountItemReqSelf <= agreeOrder.amountItemSelf, "[ERR]Not enough item amount.");
-        (agreeOrder.selfKind, agreeOrder.orderKindPeer) = analyzeOrderKindInfo(agreeOrder.orderKindSelf);
-        OrderInfo storage s_orderInfoPeer = s_items[idItem].prices[price].orderInfo[agreeOrder.orderKindPeer];
-        
-        uint32 indexStartSelfNew = s_orderInfoSelf.indexStart;
-        uint32 indexStartPeerNew = s_orderInfoPeer.indexStart;
-        uint32 listLenSelf = uint32(s_orderInfoSelf.orderList.length);
+        require(amountItemReqSelf <= s_orderInfoSelf.orderList[indexOrderSelf].amountItem, "[ERR]Not enough item amount.");
+        (uint8 selfKind, uint8 orderKindPeer) = analyzeOrderKindInfo(orderKindSelf);
+        OrderInfo storage s_orderInfoPeer = s_items[idItem].prices[price].orderInfo[orderKindPeer];
         uint32 listLenPeer = uint32(s_orderInfoPeer.orderList.length);
         uint32 amountItemRemain = amountItemReqSelf;
         require(s_orderInfoPeer.indexStart < listLenPeer, "[ERR]No order.");
-        for(agreeOrder.indexOrderPeer = s_orderInfoPeer.indexStart; agreeOrder.indexOrderPeer < listLenPeer; agreeOrder.indexOrderPeer += 1){
-            agreeOrder.amountItemPeer = s_orderInfoPeer.orderList[agreeOrder.indexOrderPeer].amountItem;
-            if(agreeOrder.amountItemPeer != 0){
-                if(s_orderInfoSelf.orderList[agreeOrder.indexOrderSelf].xOwner != s_orderInfoPeer.orderList[agreeOrder.indexOrderPeer].xOwner){
-                    uint32 amountItemDone = 0;
-                    if(amountItemRemain <= agreeOrder.amountItemPeer){
-                        amountItemDone = amountItemRemain;
-                        amountItemRemain = 0;
-                    }else{
-                        amountItemDone = agreeOrder.amountItemPeer;
-                        amountItemRemain = amountItemRemain - amountItemDone;
-                    }
-                    s_orderInfoSelf.orderList[agreeOrder.indexOrderSelf].amountItem -= amountItemDone;
-                    s_orderInfoPeer.orderList[agreeOrder.indexOrderPeer].amountItem -= amountItemDone;
-                    if(s_orderInfoSelf.orderList[agreeOrder.indexOrderSelf].amountItem == 0){
-                        indexStartSelfNew = agreeOrder.indexOrderSelf + 1;
-                    }
-                    if(s_orderInfoPeer.orderList[agreeOrder.indexOrderPeer].amountItem == 0){
-                        indexStartPeerNew = agreeOrder.indexOrderPeer + 1;
-                    }
-                    if(amountItemDone > 0){
-                        trade(agreeOrder, amountItemDone, s_orderInfoSelf.orderList[agreeOrder.indexOrderSelf].xOwner, s_orderInfoPeer.orderList[agreeOrder.indexOrderPeer].xOwner);
-                    }
-                    if(amountItemRemain <= 0){
-                        break;
-                    }
-                }
-            }
-        }
-        if(indexStartSelfNew > s_orderInfoSelf.indexStart){
-            for(agreeOrder.indexOrderSelf = s_orderInfoSelf.indexStart; agreeOrder.indexOrderSelf < listLenSelf; agreeOrder.indexOrderSelf += 1){
-                if(s_orderInfoSelf.orderList[agreeOrder.indexOrderSelf].amountItem != 0){
+        for(uint32 indexOrderPeer = s_orderInfoPeer.indexStart; indexOrderPeer < listLenPeer; indexOrderPeer += 1){
+            uint32 amountItemPeer = s_orderInfoPeer.orderList[indexOrderPeer].amountItem;
+            if(amountItemPeer != 0){
+                amountItemRemain = matching(idItem, price, selfKind, s_orderInfoSelf, s_orderInfoPeer, indexOrderSelf, indexOrderPeer, amountItemPeer, amountItemRemain);
+                if(amountItemRemain <= 0){
                     break;
                 }
             }
-            if(agreeOrder.indexOrderSelf > s_orderInfoSelf.indexStart){
-                s_items[idItem].prices[price].orderInfo[agreeOrder.orderKindSelf].indexStart = agreeOrder.indexOrderSelf;
+        }
+        updateIndexStart(idItem, price, orderKindSelf);
+        updateIndexStart(idItem, price, orderKindPeer);
+    }
+    function matching(uint256 idItem, uint32 price, uint8 selfKind, OrderInfo storage s_orderInfoSelf, OrderInfo storage s_orderInfoPeer, uint32 indexOrderSelf, uint32 indexOrderPeer, uint32 amountItemPeer, uint32 amountItemRemain) private returns(uint32 amountItemRemainNew) {
+        uint32 amountItemDone = 0;
+        if(s_orderInfoSelf.orderList[indexOrderSelf].xOwner != s_orderInfoPeer.orderList[indexOrderPeer].xOwner){
+            if(amountItemRemain <= amountItemPeer){
+                amountItemDone = amountItemRemain;
+                amountItemRemainNew = 0;
+            }else{
+                amountItemDone = amountItemPeer;
+                amountItemRemainNew = amountItemRemain - amountItemDone;
+            }
+            s_orderInfoSelf.orderList[indexOrderSelf].amountItem -= amountItemDone;
+            s_orderInfoPeer.orderList[indexOrderPeer].amountItem -= amountItemDone;
+            if(amountItemDone > 0){
+                trade(idItem, price, selfKind, amountItemDone, s_orderInfoSelf.orderList[indexOrderSelf].xOwner, s_orderInfoPeer.orderList[indexOrderPeer].xOwner);
             }
         }
-        if(indexStartPeerNew > s_orderInfoPeer.indexStart){
-            s_items[idItem].prices[price].orderInfo[agreeOrder.orderKindPeer].indexStart = indexStartPeerNew;
-        }
     }
+    function CancelOrder(uint256 idItem, uint32 price, uint8 orderKindSelf, uint32 indexOrderSelf) public {
+        OrderInfo storage s_orderInfoSelf = s_items[idItem].prices[price].orderInfo[orderKindSelf];
+        require(s_orderInfoSelf.orderList[indexOrderSelf].xOwner == msg.sender, "[ERR]Not owner.");
+        uint32 amountItem = s_orderInfoSelf.orderList[indexOrderSelf].amountItem;
+        s_orderInfoSelf.orderList[indexOrderSelf].amountItem = 0;
+        updateIndexStart(idItem, price, orderKindSelf);
+        (uint8 selfKind,) = analyzeOrderKindInfo(orderKindSelf);
+        if(selfKind == SELF_KIND_SELLER){
+            // Item : xOnOrder > msg.sender
+            item_fromOnOrderToSender(idItem, amountItem);
+        }else{
+            // Wei : xOnOrder > msg.sender
+            uint256 amountWei = amountItem * price;
+            amountWei += getFeeBase(amountWei);
+            wei_fromOnOrderToSender(amountWei);
+        }
+        emit infoCancel(idItem, price, orderKindSelf, indexOrderSelf, amountItem);
+    }
+    event infoCancel(uint256 idItem, uint32 price, uint8 orderKindSelf, uint32 indexOrderSelf, uint32 amountItem);
     function analyzeOrderKindInfo(uint8 orderKindSelf) private pure returns(uint8 selfKind, uint8 orderKindPeer) {
         if(orderKindSelf == ORDER_KIND_SELL){
             selfKind = SELF_KIND_SELLER;
             orderKindPeer = ORDER_KIND_BUY;
-        } else if(orderKindSelf == ORDER_KIND_BUY){
+        }else if(orderKindSelf == ORDER_KIND_BUY){
             selfKind = SELF_KIND_BUYER;
             orderKindPeer = ORDER_KIND_SELL;
-        } else {
+        }else {
             require((orderKindSelf == ORDER_KIND_SELL)||(orderKindSelf == ORDER_KIND_BUY), "[ERR]Invalid order kind.");
         }
     }
-    event agreeInfo(uint8 selfKind, uint32 price, uint32 amountItemDone);
-    function trade(AgreeOrder memory agreeOrder, uint32 amountItemDone, address xSelf, address xPeer) private {
-        if(agreeOrder.selfKind == SELF_KIND_SELLER){
-           wei_item_trade(agreeOrder.idItem, agreeOrder.price, amountItemDone, xSelf, xPeer);
-        } else{
-           wei_item_trade(agreeOrder.idItem, agreeOrder.price, amountItemDone, xPeer, xSelf);
+    function updateIndexStart(uint256 idItem, uint32 price, uint8 orderKind) private {
+        OrderInfo storage s_orderInfo = s_items[idItem].prices[price].orderInfo[orderKind];
+        uint32 listLen = uint32(s_orderInfo.orderList.length);
+        uint32 indexOrder;
+        for(indexOrder = s_orderInfo.indexStart; indexOrder < listLen; indexOrder += 1){
+            if(s_orderInfo.orderList[indexOrder].amountItem != 0){
+                break;
+            }
         }
-        emit agreeInfo(agreeOrder.selfKind, agreeOrder.price, amountItemDone);
+        if(indexOrder > s_orderInfo.indexStart){
+            s_orderInfo.indexStart = indexOrder;
+        }
     }
-    function wei_item_trade(uint256 idItem, uint32 price, uint32 amountItem, address xSeller, address xBuyer) private {
+    
+    function trade(uint256 idItem, uint32 price, uint8 selfKind, uint32 amountItemDone, address xSelf, address xPeer) private {
+        uint256 feeForWorker;
+        if(selfKind == SELF_KIND_SELLER){
+           feeForWorker = wei_item_trade(idItem, price, amountItemDone, xSelf, xPeer);
+        }else{
+           feeForWorker = wei_item_trade(idItem, price, amountItemDone, xPeer, xSelf);
+        }
+        emit infoMatching(idItem, price, amountItemDone, xSelf, xPeer, feeForWorker);
+    }
+    event infoMatching(uint256 idItem, uint32 price, uint32 amountItemDone, address xSelf, address xPeer, uint256 feeForWorker);
+    uint256 constant FEE_RATE = 1;					// Fee rate : 1%
+    function getFeeBase(uint256 amountWei) private pure returns(uint256 feeBase) {
+        feeBase = (amountWei / 100) * FEE_RATE;
+    }
+    function wei_item_trade(uint256 idItem, uint32 price, uint32 amountItem, address xSeller, address xBuyer) private returns (uint256 feeForWorker){
         // Item : xOnOrder > xBuyer
         s_onOrder.Item_SendTo(xBuyer, idItem, amountItem);
-        // Wei : xOnOrder > xSeller
+        // Wei : xOnOrder > xSeller, xAgree
         uint256 amountWei = amountItem * price;
-        s_balances[address(s_onOrder)] -= amountWei;
-        s_balances[xSeller] += amountWei;
+        uint256 feeBase = getFeeBase(amountWei);
+        s_balances[address(s_onOrder)] -= amountWei + feeBase;	// Fee payment by Buyer
+        s_balances[xSeller] += amountWei - feeBase;			// Fee payment by Seller
+        feeForWorker = feeBase + feeBase;
+        s_balances[msg.sender] += feeForWorker;			// Fee receipt for a matching worker
     }
     function wei_fromSenderToOnOrder(uint256 amountWei) private {
         // Wei : msg.sender > xOnOrder
@@ -243,13 +242,14 @@ contract DigitalItems is ERC1155 {
     }
     function item_fromSenderToOnOrder(uint256 idItem, uint32 amountItem) private {
         // Item : msg.sender > xOnOrder
-        setApprovalForAll(address(s_onOrder),true);
+        setApprovalForAll(address(s_onOrder), true);
         s_onOrder.Item_RecvFrom(msg.sender, idItem, amountItem);
     }
     function item_fromOnOrderToSender(uint256 idItem, uint32 amountItem) private {
         // Item : xOnOrder > msg.sender
         s_onOrder.Item_SendTo(msg.sender, idItem, amountItem);
     }
+
 
     event InfoAddress(address target);
     event InfoUint(uint256 target);
