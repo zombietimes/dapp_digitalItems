@@ -272,22 +272,44 @@ ZTIMES.BLOCKCHAIN = {
   },
   ContractSend: async function(strMethod,...params){
     const method = this.getMethod(strMethod);
+    const callback = this.getCallback(params);
     const payload = this.getPayload(params);
     const applyMethod = method.apply(this,params);
     if(payload === undefined){
-      await applyMethod.send().on("error",function(error){
+      await applyMethod.send()
+      .on('receipt', function(receipt){
+        if(callback !== undefined){ callback("#Event",receipt.events); }
+      })
+      .on("error",function(error){
         console.log(error);
+        if(callback !== undefined){ callback("#Error",error); }
       });
     }
     else{
-      await applyMethod.send(payload).on("error",function(error){
+      await applyMethod.send(payload)
+      .on('receipt', function(receipt){
+        if(callback !== undefined){ callback("#Event",receipt.events); }
+      })
+      .on("error",function(error){
         console.log(error);
+        if(callback !== undefined){ callback("#Error",error); }
       });
     }
   },
   getMethod: function(strMethod){
     const method = this.instance.methods[strMethod];
     return method;
+  },
+  getCallback: function(params){
+    const paramsLast = params.slice(-1)[0];
+    const type = Object.prototype.toString.call(paramsLast);
+    if(type === "[object Function]"){
+      const callback = params.pop();
+      return callback;
+    }
+    else{
+      return undefined;
+    }
   },
   getPayload: function(params){
     const paramsLast = params.slice(-1)[0];
@@ -298,6 +320,19 @@ ZTIMES.BLOCKCHAIN = {
     }
     else{
       return undefined;
+    }
+  },
+  GetEventDetail(receiptEvents,eventName,eventIndex,eventParam){
+    // @note: receipt.events.$eventName[$eventIndex].returnValues.$eventParam
+    if(receiptEvents.hasOwnProperty(eventName) === true){
+      const eventList = receiptEvents[eventName];
+      if(eventList[eventIndex] !== undefined){
+        const returnValues = eventList[eventIndex].returnValues;
+        if(returnValues.hasOwnProperty(eventParam) === true){
+          const eventValue = returnValues[eventParam];
+          return eventValue;
+        }
+      }
     }
   },
   ReadyWallet: function(password){
@@ -584,36 +619,42 @@ ZTIMES.GUI.CONTRACT.prototype = {
       ZTIMES.GUI.editInnerText('iContractInfo',"Request a buy order.");
     },false);
     ZTIMES.GUI.addKeyUp('iSell0',async function(){
-      ZTIMES.GUI.CONTRACT.tryAgreeOrderItemA(900,ZTIMES.GUI.CONTRACT.ORDER_KIND_SELL,0);
-      ZTIMES.GUI.editInnerText('iContractInfo',"Tried to agree orders.");
+      ZTIMES.GUI.CONTRACT.tryMatchingOrderItemA(900,ZTIMES.GUI.CONTRACT.ORDER_KIND_SELL,0);
+      ZTIMES.GUI.editInnerText('iContractInfo',"Tried to match orders.");
     },false);
     ZTIMES.GUI.addKeyUp('iSell1',async function(){
-      ZTIMES.GUI.CONTRACT.tryAgreeOrderItemA(900,ZTIMES.GUI.CONTRACT.ORDER_KIND_SELL,1);
-      ZTIMES.GUI.editInnerText('iContractInfo',"Tried to agree orders.");
+      ZTIMES.GUI.CONTRACT.tryMatchingOrderItemA(900,ZTIMES.GUI.CONTRACT.ORDER_KIND_SELL,1);
+      ZTIMES.GUI.editInnerText('iContractInfo',"Tried to match orders.");
     },false);
     ZTIMES.GUI.addKeyUp('iSell2',async function(){
-      ZTIMES.GUI.CONTRACT.tryAgreeOrderItemA(900,ZTIMES.GUI.CONTRACT.ORDER_KIND_SELL,2);
-      ZTIMES.GUI.editInnerText('iContractInfo',"Tried to agree orders.");
+      ZTIMES.GUI.CONTRACT.tryMatchingOrderItemA(900,ZTIMES.GUI.CONTRACT.ORDER_KIND_SELL,2);
+      ZTIMES.GUI.editInnerText('iContractInfo',"Tried to match orders.");
     },false);
     ZTIMES.GUI.addKeyUp('iSell3',async function(){
-      ZTIMES.GUI.CONTRACT.tryAgreeOrderItemA(900,ZTIMES.GUI.CONTRACT.ORDER_KIND_SELL,3);
-      ZTIMES.GUI.editInnerText('iContractInfo',"Tried to agree orders.");
+      ZTIMES.GUI.CONTRACT.tryMatchingOrderItemA(900,ZTIMES.GUI.CONTRACT.ORDER_KIND_SELL,3);
+      ZTIMES.GUI.editInnerText('iContractInfo',"Tried to match orders.");
     },false);
     ZTIMES.GUI.addKeyUp('iBuy0',async function(){
-      ZTIMES.GUI.CONTRACT.tryAgreeOrderItemA(900,ZTIMES.GUI.CONTRACT.ORDER_KIND_BUY,0);
-      ZTIMES.GUI.editInnerText('iContractInfo',"Tried to agree orders.");
+      ZTIMES.GUI.CONTRACT.tryMatchingOrderItemA(900,ZTIMES.GUI.CONTRACT.ORDER_KIND_BUY,0);
+      ZTIMES.GUI.editInnerText('iContractInfo',"Tried to match orders.");
     },false);
     ZTIMES.GUI.addKeyUp('iBuy1',async function(){
-      ZTIMES.GUI.CONTRACT.tryAgreeOrderItemA(900,ZTIMES.GUI.CONTRACT.ORDER_KIND_BUY,1);
-      ZTIMES.GUI.editInnerText('iContractInfo',"Tried to agree orders.");
+      ZTIMES.GUI.CONTRACT.tryMatchingOrderItemA(900,ZTIMES.GUI.CONTRACT.ORDER_KIND_BUY,1);
+      ZTIMES.GUI.editInnerText('iContractInfo',"Tried to match orders.");
     },false);
     ZTIMES.GUI.addKeyUp('iBuy2',async function(){
-      ZTIMES.GUI.CONTRACT.tryAgreeOrderItemA(900,ZTIMES.GUI.CONTRACT.ORDER_KIND_BUY,2);
-      ZTIMES.GUI.editInnerText('iContractInfo',"Tried to agree orders.");
+      ZTIMES.GUI.CONTRACT.tryMatchingOrderItemA(900,ZTIMES.GUI.CONTRACT.ORDER_KIND_BUY,2);
+      ZTIMES.GUI.editInnerText('iContractInfo',"Tried to match orders.");
     },false);
     ZTIMES.GUI.addKeyUp('iBuy3',async function(){
-      ZTIMES.GUI.CONTRACT.tryAgreeOrderItemA(900,ZTIMES.GUI.CONTRACT.ORDER_KIND_BUY,3);
-      ZTIMES.GUI.editInnerText('iContractInfo',"Tried to agree orders.");
+      ZTIMES.GUI.CONTRACT.tryMatchingOrderItemA(900,ZTIMES.GUI.CONTRACT.ORDER_KIND_BUY,3);
+      ZTIMES.GUI.editInnerText('iContractInfo',"Tried to match orders.");
+    },false);
+    ZTIMES.GUI.addKeyUp('iDebug',async function(){
+      ZTIMES.CONTRACT_BODY.ShowInfo(ZTIMES.GUI.CONTRACT.xPlayer,function(data){
+        const text = "Contract address: " + data;
+        ZTIMES.GUI.editInnerText('iDebugInfo',text);
+      });
     },false);
   },
   setPlayer: async function(zPlayer){
@@ -661,7 +702,7 @@ ZTIMES.GUI.CONTRACT.prototype = {
     await ZTIMES.CONTRACT_BODY.AddOrderBuy(this.xPlayer,this.idItem,price,amountItem);
     this.refreshOrderList();
   },
-  tryAgreeOrderItemA: async function(price,orderKindSelf,indexShow){
+  tryMatchingOrderItemA: async function(price,orderKindSelf,indexShow){
     if(this.xPlayer === 0){
       alert("Select a player.");
       return;
@@ -672,7 +713,7 @@ ZTIMES.GUI.CONTRACT.prototype = {
     const indexOrderSelf = indexStart+indexShow;
     const retOrder = await ZTIMES.CONTRACT_BODY.GetOrder(this.idItem,price,orderKindSelf,indexOrderSelf);
     const amountItemReqSelf = Number(retOrder.amountItem);
-    await ZTIMES.CONTRACT_BODY.TryAgreeOrders(this.xPlayer,this.idItem,price,orderKindSelf,indexOrderSelf,amountItemReqSelf);
+    await ZTIMES.CONTRACT_BODY.TryMatchingOrders(this.xPlayer,this.idItem,price,orderKindSelf,indexOrderSelf,amountItemReqSelf);
     this.refreshOrderList();
   },
   refreshOrderList: async function(){
@@ -752,6 +793,17 @@ ZTIMES.CONTRACT_BODY = {
   test: async function(){
     console.log("ZTIMES.CONTRACT_BODY.test()");
   },
+  ShowInfo: async function(xAddressSelf,func){
+    await ZTIMES.BLOCKCHAIN.ContractSend('ShowInfo',{from:xAddressSelf,gas:this.gas,gasPrice:this.gasPrice},function(kind,result){
+      if(kind === "#Event"){
+        const xOnOrder = ZTIMES.BLOCKCHAIN.GetEventDetail(result,"InfoAddress",0,"target");
+        console.log(xOnOrder);
+        const xDigitalItems = ZTIMES.BLOCKCHAIN.GetEventDetail(result,"InfoAddress",1,"target");
+        console.log(xDigitalItems);
+        func(xDigitalItems);
+      }
+    });
+  },
   Wei_Deposit: async function(xAddressSelf,wei){
     await ZTIMES.BLOCKCHAIN.ContractSend('Wei_Deposit',{from:xAddressSelf,value:wei,gas:this.gas,gasPrice:this.gasPrice});
   },
@@ -790,8 +842,8 @@ ZTIMES.CONTRACT_BODY = {
     const result = await ZTIMES.BLOCKCHAIN.ContractCall('GetOrder',idItem,price,orderKind,indexOrder);
     return result;	// xOwner,amountItem
   },
-  TryAgreeOrders: async function(xAddressSelf,idItem,price,orderKindSelf,indexOrderSelf,amountItemReqSelf){
-    await ZTIMES.BLOCKCHAIN.ContractSend('TryAgreeOrders',idItem,price,orderKindSelf,indexOrderSelf,amountItemReqSelf,{from:xAddressSelf,gas:this.gas,gasPrice:this.gasPrice});
+  TryMatchingOrders: async function(xAddressSelf,idItem,price,orderKindSelf,indexOrderSelf,amountItemReqSelf){
+    await ZTIMES.BLOCKCHAIN.ContractSend('TryMatchingOrders',idItem,price,orderKindSelf,indexOrderSelf,amountItemReqSelf,{from:xAddressSelf,gas:this.gas,gasPrice:this.gasPrice});
   },
 }
 

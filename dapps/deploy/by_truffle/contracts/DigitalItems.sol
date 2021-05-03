@@ -121,9 +121,6 @@ contract DigitalItems is ERC1155 {
 
     uint8 constant SELF_KIND_SELLER = 0;
     uint8 constant SELF_KIND_BUYER = 1;
-    function TryAgreeOrders(uint256 idItem, uint32 price, uint8 orderKindSelf, uint32 indexOrderSelf, uint32 amountItemReqSelf) public {
-        TryMatchingOrders(idItem, price, orderKindSelf, indexOrderSelf, amountItemReqSelf);
-    }
     function TryMatchingOrders(uint256 idItem, uint32 price, uint8 orderKindSelf, uint32 indexOrderSelf, uint32 amountItemReqSelf) public {
         OrderInfo storage s_orderInfoSelf = s_items[idItem].prices[price].orderInfo[orderKindSelf];
         require(amountItemReqSelf <= s_orderInfoSelf.orderList[indexOrderSelf].amountItem, "[ERR]Not enough item amount.");
